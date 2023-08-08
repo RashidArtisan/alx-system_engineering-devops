@@ -1,37 +1,35 @@
 #!/usr/bin/python3
 """Module for task 2"""
-
-def recurse(subreddit, hot_list=[], count=0, after=None):
-    """Queries the Reddit API and returns all hot posts
-    of the subreddit"""
+def recurse(subreddit, hot_list=[], after=None):
+    """Queries the Reddit API recursively and returns all hot post titles of the subreddit"""
     import requests
 
-    try:
-        sub_info = requests.get(
-            f"https://www.reddit.com/r/{subreddit}/hot.json",
-            params={"limit": 25, "count": count, "after": after},
-            headers={"User-Agent": "MyRedditScraper/1.0"},
-            allow_redirects=False
-        )
-        
-        if sub_info.status_code >= 400:
-            print(f"Error: HTTP {sub_info.status_code}")
-            return None
+    sub_info = requests.get(
+        f"https://www.reddit.com/r/{subreddit}/hot.json",
+        params={"after": after},
+        headers={"User-Agent": "MyRedditScraper/1.0"},
+        allow_redirects=False
+    )
 
-        info = sub_info.json()
-
-        hot_l = hot_list + [child.get("data").get("title")
-                            for child in info.get("data").get("children")]
-
-        if not info.get("data").get("after"):
-            return hot_l
-
-        return recurse(subreddit, hot_l, info.get("data").get("count"),
-                       info.get("data").get("after"))
-
-    except requests.exceptions.RequestException as e:
-        print("Error making the request:", e)
+    if sub_info.status_code >= 400:
+        print(f"Error: HTTP {sub_info.status_code}")
         return None
+
+    try:
+        info = sub_info.json()
+        posts = info.get("data", {}).get("children", [])
+
+        if not posts:
+            return hot_list
+
+        hot_list.extend([post.get("data", {}).get("title", "") for post in posts])
+
+        after = info.get("data", {}).get("after", None)
+        if after is None:
+            return hot_list
+        else:
+            return recurse(subreddit, hot_list, after)
+
     except (ValueError, KeyError) as e:
         print("Error parsing JSON response:", e)
         return None
@@ -45,4 +43,5 @@ if hot_titles is None:
 else:
     for i, title in enumerate(hot_titles, start=1):
         print(f"{i}. {title}")
+
 
