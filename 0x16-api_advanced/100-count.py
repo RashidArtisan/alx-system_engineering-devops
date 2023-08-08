@@ -1,45 +1,46 @@
-def count_words(subreddit, word_list, after=None, word_count={}):
-    """Queries the Reddit API recursively, counts occurrences of keywords in hot post titles, and prints the count."""
-    import requests
+import json
+import requests
 
-    sub_info = requests.get(
-        f"https://www.reddit.com/r/{subreddit}/hot.json",
-        params={"after": after},
-        headers={"User-Agent": "MyRedditScraper/1.0"},
-        allow_redirects=False
-    )
+def count_words(subreddit, word_list, after=None, count=None):
+    if after is None:
+        count = [0] * len(word_list)
 
-    if sub_info.status_code >= 400:
-        print(f"Error: HTTP {sub_info.status_code}")
-        return
+    url = f"https://www.reddit.com/r/{subreddit}/hot.json"
+    headers = {'user-agent': 'bhalut'}
+    params = {'after': after} if after else None
 
-    try:
-        info = sub_info.json()
-        posts = info.get("data", {}).get("children", [])
+    response = requests.get(url, params=params, headers=headers, allow_redirects=False)
 
-        for post in posts:
-            title = post.get("data", {}).get("title", "").lower()
+    if response.status_code == 200:
+        data = response.json()
 
-            for word in word_list:
-                word = word.lower()
-                if word in title:
-                    word_count[word] = word_count.get(word, 0) + 1
+        for topic in data['data']['children']:
+            title_words = topic['data']['title'].split()
+            for word in title_words:
+                word = word.lower().rstrip('.,!?_')
+                if word in word_list:
+                    index = word_list.index(word)
+                    count[index] += 1
 
-        after = info.get("data", {}).get("after", None)
+        after = data['data']['after']
         if after is None:
-            sorted_counts = sorted(word_count.items(), key=lambda x: (-x[1], x[0]))
-            for word, count in sorted_counts:
+            combined_words = {}
+            for i, word in enumerate(word_list):
+                word = word.lower()
+                if word in combined_words:
+                    combined_words[word] += count[i]
+                else:
+                    combined_words[word] = count[i]
+
+            sorted_words = sorted(combined_words.items(), key=lambda x: (-x[1], x[0]))
+
+            for word, count in sorted_words:
                 print(f"{word}: {count}")
-            return
-
-        return count_words(subreddit, word_list, after, word_count)
-
-    except (ValueError, KeyError) as e:
-        print("Error parsing JSON response:", e)
-        return
+        else:
+            count_words(subreddit, word_list, after, count)
 
 # Example usage
-subreddit_name = "news"
-keywords = ["python", "java", "javascript"]
-count_words(subreddit_name, keywords)
+subreddit = "python"
+keywords = ["python", "code", "programming"]
+count_words(subreddit, keywords)
 
