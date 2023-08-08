@@ -1,18 +1,20 @@
-import requests
+#!/usr/bin/python3
+"""Module for task 3"""
 
-def count_words(subreddit, word_list, after=None, word_count=None):
-    if word_count is None:
-        word_count = {}
 
-    sub_info = requests.get(
-        f"https://www.reddit.com/r/{subreddit}/hot.json",
-        params={"after": after},
-        headers={"User-Agent": "My-User-Agent"},
-        allow_redirects=False
-    )
+def count_words(subreddit, word_list, word_count={}, after=None):
+    """Queries the Reddit API and returns the count of words in
+    word_list in the titles of all the hot posts
+    of the subreddit"""
+    import requests
 
+    sub_info = requests.get("https://www.reddit.com/r/{}/hot.json"
+                            .format(subreddit),
+                            params={"after": after},
+                            headers={"User-Agent": "My-User-Agent"},
+                            allow_redirects=False)
     if sub_info.status_code != 200:
-        return
+        return None
 
     info = sub_info.json()
 
@@ -20,30 +22,26 @@ def count_words(subreddit, word_list, after=None, word_count=None):
              for child in info
              .get("data")
              .get("children")]
-
     if not hot_l:
-        return
+        return None
+
+    word_list = list(dict.fromkeys(word_list))
+
+    if word_count == {}:
+        word_count = {word: 0 for word in word_list}
 
     for title in hot_l:
         split_words = title.split(' ')
         for word in word_list:
             for s_word in split_words:
-                normalized_word = s_word.lower().strip('!._')
-                if normalized_word == word.lower():
-                    if word in word_count:
-                        word_count[word] += 1
-                    else:
-                        word_count[word] = 1
+                if s_word.lower() == word.lower():
+                    word_count[word] += 1
 
     if not info.get("data").get("after"):
-        sorted_counts = sorted(word_count.items(), key=lambda kv: (-kv[1], kv[0].lower()))
-        for k, v in sorted_counts:
-            print('{}: {}'.format(k.lower(), v))
+        sorted_counts = sorted(word_count.items(), key=lambda kv: kv[0])
+        sorted_counts = sorted(word_count.items(),
+                               key=lambda kv: kv[1], reverse=True)
+        [print('{}: {}'.format(k, v)) for k, v in sorted_counts if v != 0]
     else:
-        count_words(subreddit, word_list, info.get("data").get("after"), word_count)
-
-""" Example usage"""
-subreddit = "programming"
-word_list = ["python", "java", "javascript"]
-count_words(subreddit, word_list)
-
+        return count_words(subreddit, word_list, word_count,
+                           info.get("data").get("after"))
