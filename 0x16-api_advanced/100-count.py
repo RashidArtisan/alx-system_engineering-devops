@@ -1,12 +1,14 @@
 #!/usr/bin/python3
 """Module for task 3"""
 
-
-def count_words(subreddit, word_list, word_count={}, after=None):
+def count_words(subreddit, word_list, word_count=None, after=None):
     """Queries the Reddit API and returns the count of words in
     word_list in the titles of all the hot posts
     of the subreddit"""
     import requests
+
+    if word_count is None:
+        word_count = {}
 
     sub_info = requests.get("https://www.reddit.com/r/{}/hot.json"
                             .format(subreddit),
@@ -27,21 +29,25 @@ def count_words(subreddit, word_list, word_count={}, after=None):
 
     word_list = list(dict.fromkeys(word_list))
 
-    if word_count == {}:
-        word_count = {word: 0 for word in word_list}
-
     for title in hot_l:
         split_words = title.split(' ')
         for word in word_list:
             for s_word in split_words:
                 if s_word.lower() == word.lower():
-                    word_count[word] += 1
+                    if word in word_count:
+                        word_count[word] += 1
+                    else:
+                        word_count[word] = 1
 
     if not info.get("data").get("after"):
-        sorted_counts = sorted(word_count.items(), key=lambda kv: kv[0])
-        sorted_counts = sorted(word_count.items(),
-                               key=lambda kv: kv[1], reverse=True)
-        [print('{}: {}'.format(k, v)) for k, v in sorted_counts if v != 0]
+        sorted_counts = sorted(word_count.items(), key=lambda kv: (-kv[1], kv[0].lower()))
+        for k, v in sorted_counts:
+            print('{}: {}'.format(k.lower(), v))
     else:
-        return count_words(subreddit, word_list, word_count,
-                           info.get("data").get("after"))
+        count_words(subreddit, word_list, word_count,
+                    info.get("data").get("after"))
+
+""" Example usage"""
+subreddit = "programming"
+word_list = ["python", "java", "javascript"]
+count_words(subreddit, word_list)
